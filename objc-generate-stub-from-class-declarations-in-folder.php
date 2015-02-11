@@ -41,6 +41,12 @@ $useOCMockObject	= false;
 
 $ignoreClassesWithoutMethods = true; // if you want to avoid generating test cases for classes without methods.
 
+// list of lower case class names we will generate no test class for.
+$useClassBlacklist   = false;
+$ignoreClassesByName = array(
+	'appdelegate',
+);
+
 // list of files to automatically and always import in each test case
 $autoimports		= array();
 
@@ -61,6 +67,61 @@ function scan($pathToProject) {
 /// LOGIC: PARSING
 function parseDeclarationFromFile($filename) {
 	// TODO: combine scanning for header, methods, end of declaration into this parsing function so it will become more reliable
+	$contents = file($filename);
+	
+	$classDeclOpen = false;
+	$methodDeclOpen = false;
+	$bracketCount = 0;
+	$bracketCountUponMethodDeclOpen = 0;
+	
+	$methods = array();
+	
+	foreach ($contents as $line) {
+		$line = trim($line); // trim whitespace
+
+		if (!$classDeclOpen) { // scan for class declaration opening
+			if (mb_substr($line, 0, 11) == '@interface ') {
+				$classDeclOpen = true;
+
+				// reset list of methods, because we found a new class declaration
+				$methods = array();
+
+				// read class name
+				$className = getClassNameFromDeclarationLine($line);
+			}
+		}
+
+		if ($classDeclOpen) {
+			if (substr($line, 0, 1) == '-') {
+				$methods[] = getMethodNameFromDeclarationLine($line);
+			}
+			
+			if ($line == '@end') {
+				$classDeclOpen = false;
+				return array(
+					'class' => $className,
+					'methods' => $methods,
+				);
+			}
+		}
+	}
+}
+
+function getClassNameFromDeclarationLine($line) {
+	// split line which is expected in format:
+	// @interface <NameOfClass> ........
+	$line_parts = explode( ' ', $line );
+
+	return $line_parts[1];
+}
+
+function getMethodNameFromDeclarationLine($line) {
+	$regexp = '/^-\s*\((void|[\S]+\s\*)\)\s*(\w+)(:|;)/i';
+	$ex = preg_match( $regexp, $line, $matches );
+	return array(
+		'returnType' => $matches[1],
+		'name' => $matches[2],
+	);
 }
 
 function scanHeaderFileForClassName($file) {	
@@ -68,11 +129,7 @@ function scanHeaderFileForClassName($file) {
 	
 	foreach($contents as $line) {
 		if (mb_substr($line, 0, 11) == '@interface ') {
-			// split line which is expected in format:
-			// @interface <NameOfClass> ........
-			$line_parts = explode( ' ', $line );
-
-			return $line_parts[1];
+			return getClassNameFromDeclarationLine($line);
 		}
 	}
 	
@@ -84,13 +141,9 @@ function scanHeaderFileForMethods($file) {
 
 	$contents = file($file);
 	foreach($contents as $line) {
-		if ($line{0} == '-') {
-			$regexp = '/^-\s*\((void|[\S]+\s\*)\)\s*(\w+)(:|;)/i';
-			$ex = preg_match( $regexp, $line, $matches );
-			$returnValue[] = array(
-				'returnType' => $matches[1],
-				'name' => $matches[2],
-			);
+		$line = trim($line);
+		if (substr($line, 0, 1) == '-') {
+			$returnValue[] = getMethodNameFromDeclarationLine($line);
 		}
 	}
 
@@ -217,7 +270,26 @@ function writeToDisk($filename, $content) {
 }
 
 
+function mayGenerateTestClass($className, $methods) {
+	global $useClassBlacklist;
+	global $ignoreClassesByName;
+	global $ignoreClassesWithoutMethods;
 
+	// if there are no methods detected, we might generate no test class...
+	if ($ignoreClassesWithoutMethods && (count($methods) < 1)) {
+		return false;
+	}
+	
+	// when using a blacklist we might generate no test class for the given class...
+	if ($useClassBlacklist) {
+		if (in_array(mb_strtolower($className), $ignoreClassesByName)) {
+			return false;
+		}
+	}
+
+	// okay, generate the test class
+	return true;
+}
 
 /// MAIN
 $starttime = microtime(true);
@@ -241,16 +313,20 @@ foreach ($objects as $name => $object) {
 	// only parse files with extension ".h"
 	if ( $ext == 'h' ) {
 		$numberFilesScanned++;
+		
+		$scanResult = parseDeclarationFromFile($name);
+		$classname 	= $scanResult['class'];
+		$methods 	= $scanResult['methods'];
 
-		$classname = scanHeaderFileForClassName($name);
+		//$classname = scanHeaderFileForClassName($name);
 		
 		// TODO: blacklist some filenames or classnames so we do not generate any garbage test cases
 
 		// TODO: add ability to define a text file with property names to base test generation on, like: "- (void)testHas<PropertyName> {}"
 
-		$methods = scanHeaderFileForMethods($name);
+		//$methods = scanHeaderFileForMethods($name);
 
-		if ( !$ignoreClassesWithoutMethods || (count($methods) > 1) ) {
+		if ( mayGenerateTestClass($classname, $methods) ) {
 			$testfile 		= generateTestFile($classname, $methods);
 			$testFileName 	= $basePathForTests . $classname . 'Test.m';
 
