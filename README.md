@@ -12,22 +12,29 @@ You simply need to configure the pathToProject, projectName, basePathForTests se
 The rest can be left as-is, as starting point.
 
 # configuration
-$pathToProject  = realpath('.');
-$projectName	= 'testProject';
+Setup where to scan for files and the name of the project
 
-// base path for creating the files with the generated test cases
-$basePathForTests	= './Tests/';
+    $pathToProject  = realpath('.');
+    $projectName    = 'testProject';
 
-// integrate imports for OCMock and OCMockObject usage?
-$useOCMock 			= false;
-$useOCMockObject	= false;
+base path for creating the files with the generated test cases
+
+    $basePathForTests	= './Tests/';
+
+integrate imports for OCMock and OCMockObject usage?
+
+    $useOCMock 		= false;
+    $useOCMockObject	= false;
 
 Blacklisting, to avoid generating unnecessary test classes:
-$ignoreClassesWithoutMethods = true; // if you want to avoid generating test cases for classes without methods.
+    if you want to avoid generating test cases for classes without methods.
+    
+    $ignoreClassesWithoutMethods = true;
 
-// list of lower case class names we will generate no test class for.
-$useClassBlacklist   = false;
-$ignoreClassesByName = array(
-	'appdelegate',
-);
+    list of lower case class names we will generate no test class for.
+    
+    $useClassBlacklist   = false;
+    $ignoreClassesByName = array(
+    	    'appdelegate',
+    );
 
