@@ -27,9 +27,11 @@ integrate imports for OCMock and OCMockObject usage?
     $useOCMockObject	= false;
 
 Blacklisting, to avoid generating unnecessary test classes:
+    
     if you want to avoid generating test cases for classes without methods.
     
     $ignoreClassesWithoutMethods = true;
+
 
     list of lower case class names we will generate no test class for.
     
